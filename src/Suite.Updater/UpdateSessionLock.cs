@@ -11,8 +11,7 @@ public sealed class UpdateSessionLock : IDisposable
     {
         var root = Path.GetFullPath(directory);
         Directory.CreateDirectory(root);
-        if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0)
-            throw new IOException("Invalid update directory.");
+        UpdatePathSafety.RejectLinks(root);
         var path = Path.Combine(root,"update-session.lock");
         if (File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
             throw new IOException("Invalid update lock path.");

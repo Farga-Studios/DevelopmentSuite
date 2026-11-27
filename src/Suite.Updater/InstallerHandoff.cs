@@ -18,7 +18,7 @@ public static class InstallerHandoff
         }
         catch(Exception ex) when(ex is IOException or UnauthorizedAccessException or ArgumentException or System.Security.SecurityException){return false;}
     }
-    public static async Task LaunchAsync(PreparedUpdate update,string stagingRoot,CancellationToken token=default, string? applicationUpdateSwitch=null)
+    public static async Task LaunchAsync(PreparedUpdate update,string stagingRoot,CancellationToken token=default, string? applicationUpdateSwitch=null, Guid? transactionId=null)
     {
         if(!OperatingSystem.IsWindows())throw new PlatformNotSupportedException();
         var path=Path.GetFullPath(update.Path);
@@ -33,6 +33,11 @@ public static class InstallerHandoff
         token.ThrowIfCancellationRequested();
         var info=new ProcessStartInfo(path){UseShellExecute=false,WorkingDirectory=parent};
         if(!string.IsNullOrEmpty(applicationUpdateSwitch))info.ArgumentList.Add(applicationUpdateSwitch);
+        if(transactionId is Guid id)
+        {
+            new InstallerExitEvidence(parent).Prepare(id);
+            info.ArgumentList.Add("/RECOVERYID="+id.ToString("N"));
+        }
         info.ArgumentList.Add("/NOCLOSEAPPLICATIONS");
         info.ArgumentList.Add("/WAITPID="+Environment.ProcessId);
         using var process=Process.Start(info)??throw new InvalidOperationException("Could not start installer.");

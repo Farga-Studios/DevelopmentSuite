@@ -65,6 +65,17 @@ public sealed class UpdateRecovery(UpdateJournal journal)
         return journal.Advance(id, UpdatePhase.Aborted);
     }
 
+    /// <summary>Host must verify previous installation health, installer exit and user consent under the exclusive lock.</summary>
+    public UpdateTransaction ResolveInterrupted(Guid id, Version runningVersion, bool installerExited, bool previousHealthy, bool userApproved)
+    {
+        var assessment = Assess(runningVersion);
+        if (!installerExited || !previousHealthy || !userApproved ||
+            assessment.Status != RecoveryStatus.Interrupted || assessment.Transaction is not { } t ||
+            t.Id != id || t.Phase is not (UpdatePhase.HandoffStarted or UpdatePhase.AwaitingHealthCheck))
+            throw new InvalidOperationException("Interrupted update cannot be resolved.");
+        return journal.Advance(id, UpdatePhase.Aborted);
+    }
+
     public UpdateTransaction MarkRollbackStarted(Guid id, Version runningVersion)
     {
         var assessment = Assess(runningVersion);

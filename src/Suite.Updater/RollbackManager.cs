@@ -17,7 +17,7 @@ public sealed class RollbackManager(UpdateRecovery recovery, VerifiedPackageStor
         var retained = await store.OpenAsync(t.PreviousVersion, token);
         if (retained.Manifest.Product != t.Product || retained.Manifest.Version != t.PreviousVersion)
             throw new InvalidDataException("Rollback package mismatch.");
-        Directory.CreateDirectory(stagingRoot);
+        UpdatePathSafety.EnsureDirectory(stagingRoot);
         UpdatePathSafety.RejectLinks(stagingRoot);
         var path = Path.Combine(Path.GetFullPath(stagingRoot), Guid.NewGuid().ToString("N") + "-" + retained.Manifest.FileName);
         try

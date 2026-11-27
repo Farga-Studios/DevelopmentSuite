@@ -33,7 +33,7 @@ public sealed class VerifiedPackageStore(string directory, string publicKeyPem, 
         signature = (byte[])signature.Clone();
         var manifest = SignedPackageMetadata.Authenticate(metadata, signature, publicKeyPem, product, channel);
         var destination = VersionDirectory(manifest.Version);
-        Directory.CreateDirectory(root);
+        UpdatePathSafety.EnsureDirectory(root);
         RejectLink(root);
         if (Directory.Exists(destination))
         {
@@ -42,7 +42,7 @@ public sealed class VerifiedPackageStore(string directory, string publicKeyPem, 
             return existing;
         }
         var staging = Path.Combine(root, ".pending-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(staging);
+        UpdatePathSafety.EnsureDirectory(staging);
         try
         {
             var package = Path.Combine(staging, manifest.FileName);

@@ -7,6 +7,9 @@ jobs:
   publish:
     if: github.ref == 'refs/heads/main' && github.event.repository.private == false
     environment: nuget-public
+    permissions:
+      contents: read
+      id-token: write
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,12 +32,17 @@ jobs:
       - run: dotnet test tests/Suite.Updater.Tests -c Release -f net8.0
       - run: dotnet test tests/Suite.Updater.Tests -c Release -f net10.0
       - run: dotnet pack src/Suite.Updater -c Release -o packages
+      - name: Authenticate with NuGet.org using OIDC
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: FargaStudios
       - name: Publish approved immutable package
         shell: pwsh
         env:
-          NUGET_ORG_API_KEY: ${{ secrets.NUGET_ORG_API_KEY }}
+          NUGET_ORG_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:NUGET_ORG_API_KEY)) { throw 'NuGet.org publication credential missing' }
+          if ([string]::IsNullOrWhiteSpace($env:NUGET_ORG_API_KEY)) { throw 'NuGet.org OIDC temporary credential missing' }
           $packages = @(Get-ChildItem packages -Filter 'FargaStudios.Suite.Updater.*.nupkg' -File)
           if ($packages.Count -ne 1) { throw 'Expected exactly one updater package' }
           dotnet nuget push "$($packages[0].FullName)" --source https://api.nuget.org/v3/index.json --api-key $env:NUGET_ORG_API_KEY

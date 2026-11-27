@@ -79,8 +79,8 @@ public sealed class UpdateJournal
     private static bool Allowed(UpdatePhase from, UpdatePhase to) => (from, to) switch
     {
         (UpdatePhase.Prepared, UpdatePhase.HandoffStarted or UpdatePhase.RecoveryRequired or UpdatePhase.Aborted) => true,
-        (UpdatePhase.HandoffStarted, UpdatePhase.AwaitingHealthCheck or UpdatePhase.RecoveryRequired) => true,
-        (UpdatePhase.AwaitingHealthCheck, UpdatePhase.Completed or UpdatePhase.RecoveryRequired) => true,
+        (UpdatePhase.HandoffStarted, UpdatePhase.AwaitingHealthCheck or UpdatePhase.RecoveryRequired or UpdatePhase.Aborted) => true,
+        (UpdatePhase.AwaitingHealthCheck, UpdatePhase.Completed or UpdatePhase.RecoveryRequired or UpdatePhase.Aborted) => true,
         (UpdatePhase.RecoveryRequired, UpdatePhase.RollbackStarted) => true,
         (UpdatePhase.RollbackStarted, UpdatePhase.RolledBack or UpdatePhase.RecoveryRequired) => true,
         _ => false

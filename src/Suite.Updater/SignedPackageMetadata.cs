@@ -22,7 +22,15 @@ public static class SignedPackageMetadata
         rsa.ImportFromPem(publicKeyPem);
         if (rsa.KeySize < 2048 || !rsa.VerifyData(data, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1))
             throw new CryptographicException("Update signature invalid.");
-        var m = JsonSerializer.Deserialize<UpdateManifest>(data, Json);
+        using var document = JsonDocument.Parse(data.ToArray());
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException("Invalid manifest object.");
+        var fields = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var property in document.RootElement.EnumerateObject())
+            if (!fields.Add(property.Name)) throw new InvalidDataException("Duplicate manifest field.");
+        if (!fields.SetEquals(new[]{"product","channel","version","file_name","bytes","sha256","notes"}))
+            throw new InvalidDataException("Invalid manifest fields.");
+        var m = document.RootElement.Deserialize<UpdateManifest>(Json);
         if (m is null || string.IsNullOrEmpty(product) || !product.All(c => char.IsAsciiLetterOrDigit(c) || c == '-' || c == '_') ||
             string.IsNullOrWhiteSpace(channel) || m.Product != product || m.Channel != channel ||
             !Version.TryParse(m.Version, out var version) || version.Build < 0 || version.Revision >= 0 ||

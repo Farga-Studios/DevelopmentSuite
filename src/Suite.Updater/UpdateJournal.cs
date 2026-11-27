@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace Suite.Updater;
 
-public enum UpdatePhase { Prepared, HandoffStarted, AwaitingHealthCheck, Completed, RecoveryRequired, RollbackStarted, RolledBack }
+public enum UpdatePhase { Prepared, HandoffStarted, AwaitingHealthCheck, Completed, RecoveryRequired, RollbackStarted, RolledBack, Aborted }
 public enum JournalStatus { Missing, Valid, Invalid }
 public sealed record UpdateTransaction(Guid Id, string Product, string PreviousVersion, string TargetVersion, UpdatePhase Phase);
 public sealed record JournalReadResult(JournalStatus Status, UpdateTransaction? Transaction);
@@ -59,7 +59,7 @@ public sealed class UpdateJournal
     public UpdateTransaction Begin(string previousVersion, string targetVersion)
     {
         var current = Read();
-        if (current.Status != JournalStatus.Missing && current.Transaction?.Phase is not (UpdatePhase.Completed or UpdatePhase.RolledBack))
+        if (current.Status != JournalStatus.Missing && current.Transaction?.Phase is not (UpdatePhase.Completed or UpdatePhase.RolledBack or UpdatePhase.Aborted))
             throw new InvalidOperationException("Unresolved update journal.");
         var transaction = new UpdateTransaction(Guid.NewGuid(), product, previousVersion, targetVersion, UpdatePhase.Prepared);
         Write(transaction);
@@ -78,7 +78,7 @@ public sealed class UpdateJournal
 
     private static bool Allowed(UpdatePhase from, UpdatePhase to) => (from, to) switch
     {
-        (UpdatePhase.Prepared, UpdatePhase.HandoffStarted or UpdatePhase.RecoveryRequired) => true,
+        (UpdatePhase.Prepared, UpdatePhase.HandoffStarted or UpdatePhase.RecoveryRequired or UpdatePhase.Aborted) => true,
         (UpdatePhase.HandoffStarted, UpdatePhase.AwaitingHealthCheck or UpdatePhase.RecoveryRequired) => true,
         (UpdatePhase.AwaitingHealthCheck, UpdatePhase.Completed or UpdatePhase.RecoveryRequired) => true,
         (UpdatePhase.RecoveryRequired, UpdatePhase.RollbackStarted) => true,

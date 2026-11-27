@@ -19,6 +19,15 @@ public sealed class UpdatePathSafetyTests
             Assert.ThrowsAny<IOException>(() => { using var session = UpdateSessionLock.Acquire(child); });
             Assert.ThrowsAny<IOException>(() => UpdateCleanup.RemoveAbandonedPending(child,TimeSpan.FromHours(24),DateTimeOffset.UtcNow));
             Assert.False(File.Exists(Path.Combine(real,"child","update-session.lock")));
+            var missing = Path.Combine(link,"missing","nested");
+            Assert.ThrowsAny<IOException>(() => { using var session = UpdateSessionLock.Acquire(missing); });
+            Assert.False(Directory.Exists(Path.Combine(real,"missing")));
+            var journal = new UpdateJournal(missing,"SpriteLab");
+            Assert.ThrowsAny<IOException>(() => journal.Begin("1.0.0","1.1.0"));
+            Assert.False(Directory.Exists(Path.Combine(real,"missing")));
+            var safe = Path.Combine(root,"safe","nested");
+            using (UpdateSessionLock.Acquire(safe))
+                Assert.True(Directory.Exists(safe));
         }
         finally { Directory.Delete(root,true); }
     }

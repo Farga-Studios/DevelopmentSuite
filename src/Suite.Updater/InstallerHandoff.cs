@@ -18,7 +18,7 @@ public static class InstallerHandoff
         }
         catch(Exception ex) when(ex is IOException or UnauthorizedAccessException or ArgumentException or System.Security.SecurityException){return false;}
     }
-    public static async Task LaunchAsync(PreparedUpdate update,string stagingRoot,CancellationToken token=default)
+    public static async Task LaunchAsync(PreparedUpdate update,string stagingRoot,CancellationToken token=default, string? applicationUpdateSwitch=null)
     {
         if(!OperatingSystem.IsWindows())throw new PlatformNotSupportedException();
         var path=Path.GetFullPath(update.Path);
@@ -31,7 +31,7 @@ public static class InstallerHandoff
         await UpdateClient.VerifyPackageAsync(path,update.Manifest,token);
         token.ThrowIfCancellationRequested();
         var info=new ProcessStartInfo(path){UseShellExecute=false,WorkingDirectory=parent};
-        info.ArgumentList.Add("/SPRITELABUPDATE");
+        if(!string.IsNullOrEmpty(applicationUpdateSwitch))info.ArgumentList.Add(applicationUpdateSwitch);
         info.ArgumentList.Add("/NOCLOSEAPPLICATIONS");
         info.ArgumentList.Add("/WAITPID="+Environment.ProcessId);
         using var process=Process.Start(info)??throw new InvalidOperationException("Could not start installer.");

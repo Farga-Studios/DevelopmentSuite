@@ -2,7 +2,6 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Diagnostics;
 
 namespace Suite.Updater;
 
@@ -31,7 +30,9 @@ public sealed class UpdateClient(HttpClient http, Uri manifestUri, string public
             throw new CryptographicException("Update signature invalid.");
         var m=JsonSerializer.Deserialize<UpdateManifest>(data,Json)??throw new InvalidDataException("Missing manifest.");
         Validate(m);
-        return System.Version.Parse(m.Version)>installed?m:null;
+        var available=System.Version.Parse(m.Version);
+        var normalized=new Version(installed.Major,installed.Minor,Math.Max(0,installed.Build),Math.Max(0,installed.Revision));
+        return new Version(available.Major,available.Minor,available.Build,0)>normalized?m:null;
     }
     private Uri PackageUri(UpdateManifest m)
     {
@@ -43,7 +44,8 @@ public sealed class UpdateClient(HttpClient http, Uri manifestUri, string public
     private void Validate(UpdateManifest m)
     {
         if(m.Product!=product||m.Channel!=channel||!System.Version.TryParse(m.Version,out var version)||
-            version.Build<0||version.Revision>=0||m.FileName!=$"{product}-{m.Version}-win-x64-setup.exe"||
+            version.Build<0||version.Revision>=0||m.Version!=version.ToString(3)||
+            string.IsNullOrEmpty(product)||!product.All(c=>char.IsAsciiLetterOrDigit(c)||c=='-'||c=='_')||m.FileName!=$"{product}-{m.Version}-win-x64-setup.exe"||
             m.Bytes is <1 or >536870912||m.Sha256 is null||m.Sha256.Length!=64||!m.Sha256.All(Uri.IsHexDigit)||
             m.Notes is null||m.Notes.Length>20000)throw new InvalidDataException("Invalid update manifest.");
     }

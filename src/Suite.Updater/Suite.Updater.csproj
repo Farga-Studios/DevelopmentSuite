@@ -1,1 +1,15 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><Description>Verified update metadata and downloads for the development suite.</Description></PropertyGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>FargaStudios.Suite.Updater</PackageId>
+    <Authors>Farga Studios</Authors>
+    <Description>Signed update manifests, verified downloads and Windows installer handoff for independent applications.</Description>
+    <RepositoryUrl>https://github.com/Farga-Studios/DevelopmentSuite</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/Farga-Studios/DevelopmentSuite</PackageProjectUrl>
+    <IsPackable>true</IsPackable>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+</Project>

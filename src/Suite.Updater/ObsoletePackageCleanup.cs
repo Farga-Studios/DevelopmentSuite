@@ -9,8 +9,7 @@ public static class ObsoletePackageCleanup
     {
         var root = Path.GetFullPath(cacheRoot);
         if (!Directory.Exists(root)) return new(0,0);
-        if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0)
-            throw new IOException("Invalid cache root.");
+        UpdatePathSafety.RejectLinks(root);
         var candidates = PackageRetention.Plan(Directory.EnumerateDirectories(root).Select(Path.GetFileName).OfType<string>(),
             currentVersion,previousHealthyVersion,journal.Read());
         int removed = 0, skipped = 0;

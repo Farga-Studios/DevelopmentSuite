@@ -1,0 +1,41 @@
+name: Publish updater to NuGet.org
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main' && github.event.repository.private == false
+    environment: nuget-public
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Verify public release prerequisites
+        shell: pwsh
+        run: |
+          if (!(Test-Path LICENSE)) { throw 'Open-source license missing' }
+          [xml]$props = Get-Content Directory.Build.props -Raw
+          $version = [string]$props.Project.PropertyGroup.Version
+          if ([version]$version -le [version]'0.2.0') { throw 'Assign a new package version after public-source review' }
+          [xml]$project = Get-Content src/Suite.Updater/Suite.Updater.csproj -Raw
+          if ([string]$project.Project.PropertyGroup.PackageLicenseExpression -ne 'MIT') { throw 'Package license metadata missing' }
+      - run: dotnet test tests/Suite.Updater.Tests -c Release -f net8.0
+      - run: dotnet test tests/Suite.Updater.Tests -c Release -f net10.0
+      - run: dotnet pack src/Suite.Updater -c Release -o packages
+      - name: Publish approved immutable package
+        shell: pwsh
+        env:
+          NUGET_ORG_API_KEY: ${{ secrets.NUGET_ORG_API_KEY }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:NUGET_ORG_API_KEY)) { throw 'NuGet.org publication credential missing' }
+          $packages = @(Get-ChildItem packages -Filter 'FargaStudios.Suite.Updater.*.nupkg' -File)
+          if ($packages.Count -ne 1) { throw 'Expected exactly one updater package' }
+          dotnet nuget push "$($packages[0].FullName)" --source https://api.nuget.org/v3/index.json --api-key $env:NUGET_ORG_API_KEY
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

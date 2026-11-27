@@ -1,6 +1,6 @@
-# SEALSWORN Development Suite
+# Farga Studios Development Suite
 
-Private shared foundation for independent game development tools. .NET 10; each tool owns its release lifecycle.
+Shared foundation (currently private; planned open source) for independent game development tools. .NET 10; each tool owns its release lifecycle.
 
 ## Components
 | Component | Scope | State |

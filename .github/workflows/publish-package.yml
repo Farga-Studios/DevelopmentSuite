@@ -22,4 +22,6 @@ jobs:
         env:
           NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          dotnet nuget push packages/*.nupkg --source https://nuget.pkg.github.com/Farga-Studios/index.json --api-key $env:NUGET_AUTH_TOKEN
+          $package = Get-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'packages/FargaStudios.Suite.Updater.0.2.0.nupkg') -ErrorAction Stop
+          dotnet nuget push "$($package.FullName)" --source https://nuget.pkg.github.com/Farga-Studios/index.json --api-key $env:NUGET_AUTH_TOKEN
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

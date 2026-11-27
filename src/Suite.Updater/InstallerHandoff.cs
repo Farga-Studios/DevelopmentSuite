@@ -27,6 +27,7 @@ public static class InstallerHandoff
             !Path.GetFileName(path).EndsWith("-"+update.Manifest.FileName,StringComparison.Ordinal)||
             (File.GetAttributes(path)&FileAttributes.ReparsePoint)!=0)
             throw new InvalidDataException("Invalid installer staging path.");
+        UpdatePathSafety.RejectLinks(path);
         using var locked=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read);
         await UpdateClient.VerifyPackageAsync(path,update.Manifest,token);
         token.ThrowIfCancellationRequested();

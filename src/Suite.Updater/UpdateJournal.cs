@@ -99,9 +99,9 @@ public sealed class UpdateJournal
         if (!IsValid(transaction)) throw new InvalidDataException("Invalid update transaction.");
         var bytes = JsonSerializer.SerializeToUtf8Bytes(transaction, Json);
         if (bytes.Length > MaxBytes) throw new InvalidDataException("Journal too large.");
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        UpdatePathSafety.EnsureDirectory(Path.GetDirectoryName(path)!);
         UpdatePathSafety.RejectLinks(Path.GetDirectoryName(path)!);
-        if (File.Exists(path)) UpdatePathSafety.RejectLinks(path);
+        UpdatePathSafety.RejectExistingLinks(path);
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {

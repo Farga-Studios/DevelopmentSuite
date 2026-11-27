@@ -37,7 +37,7 @@ public sealed class UpdateJournal
             using var stream = File.OpenRead(path);
             if (stream.Length > MaxBytes) return new(JournalStatus.Invalid, null);
             var bytes = new byte[MaxBytes + 1];
-            int count = stream.ReadAtLeast(bytes, bytes.Length, throwIfEndOfStream: false);
+            int count = stream.ReadAtLeast(bytes, bytes.Length, false);
             if (count > MaxBytes) return new(JournalStatus.Invalid, null);
             var transaction = JsonSerializer.Deserialize<UpdateTransaction>(bytes.AsSpan(0, count), Json);
             return IsValid(transaction) ? new(JournalStatus.Valid, transaction) : new(JournalStatus.Invalid, null);

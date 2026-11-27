@@ -3,7 +3,7 @@ namespace Suite.Updater;
 public enum RecoveryStatus
 {
     NoTransaction, InvalidJournal, Healthy, Interrupted,
-    HealthCheckRequired, RecoveryRequired, UnexpectedVersion, RollbackHealthCheckRequired, RollbackInterrupted, RolledBack
+    HealthCheckRequired, RecoveryRequired, UnexpectedVersion, RollbackHealthCheckRequired, RollbackInterrupted, RolledBack, Aborted
 }
 
 public sealed record RecoveryAssessment(RecoveryStatus Status, UpdateTransaction? Transaction);
@@ -31,6 +31,8 @@ public sealed class UpdateRecovery(UpdateJournal journal)
             UpdatePhase.RollbackStarted => RecoveryStatus.RollbackInterrupted,
             UpdatePhase.RolledBack when running == previous => RecoveryStatus.RolledBack,
             UpdatePhase.RolledBack => RecoveryStatus.UnexpectedVersion,
+            UpdatePhase.Aborted when running == previous => RecoveryStatus.Aborted,
+            UpdatePhase.Aborted => RecoveryStatus.UnexpectedVersion,
             UpdatePhase.Completed when running == target => RecoveryStatus.Healthy,
             UpdatePhase.Completed => RecoveryStatus.UnexpectedVersion,
             UpdatePhase.RecoveryRequired => RecoveryStatus.RecoveryRequired,
@@ -52,6 +54,15 @@ public sealed class UpdateRecovery(UpdateJournal journal)
         if (t.Phase == UpdatePhase.HandoffStarted)
             journal.Advance(id, UpdatePhase.AwaitingHealthCheck);
         return journal.Advance(id, UpdatePhase.Completed);
+    }
+
+    public UpdateTransaction CancelPrepared(Guid id, Version runningVersion)
+    {
+        var assessment = Assess(runningVersion);
+        if (assessment.Status != RecoveryStatus.Interrupted || assessment.Transaction is not { } t ||
+            t.Id != id || t.Phase != UpdatePhase.Prepared)
+            throw new InvalidOperationException("Only a prepared update can be cancelled before handoff.");
+        return journal.Advance(id, UpdatePhase.Aborted);
     }
 
     public UpdateTransaction MarkRollbackStarted(Guid id, Version runningVersion)

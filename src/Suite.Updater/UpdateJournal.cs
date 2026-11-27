@@ -34,6 +34,7 @@ public sealed class UpdateJournal
     {
         try
         {
+            UpdatePathSafety.RejectLinks(path);
             using var stream = File.OpenRead(path);
             if (stream.Length > MaxBytes) return new(JournalStatus.Invalid, null);
             var bytes = new byte[MaxBytes + 1];
@@ -99,6 +100,8 @@ public sealed class UpdateJournal
         var bytes = JsonSerializer.SerializeToUtf8Bytes(transaction, Json);
         if (bytes.Length > MaxBytes) throw new InvalidDataException("Journal too large.");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        UpdatePathSafety.RejectLinks(Path.GetDirectoryName(path)!);
+        if (File.Exists(path)) UpdatePathSafety.RejectLinks(path);
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {

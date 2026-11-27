@@ -10,11 +10,10 @@ public sealed class UpdateSessionLock : IDisposable
     public static UpdateSessionLock Acquire(string directory)
     {
         var root = Path.GetFullPath(directory);
-        Directory.CreateDirectory(root);
+        UpdatePathSafety.EnsureDirectory(root);
         UpdatePathSafety.RejectLinks(root);
         var path = Path.Combine(root,"update-session.lock");
-        if (File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-            throw new IOException("Invalid update lock path.");
+        UpdatePathSafety.RejectExistingLinks(path);
         return new UpdateSessionLock(new FileStream(path,FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None));
     }
 

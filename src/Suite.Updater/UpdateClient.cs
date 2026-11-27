@@ -77,6 +77,19 @@ public sealed class UpdateClient(HttpClient http, Uri manifestUri, string public
         }
         catch{if(File.Exists(path))File.Delete(path);throw;}
     }
+    /// <summary>Retain a downloaded package with authenticated original metadata.</summary>
+    public async Task<PreparedUpdate> RetainDownloadedAsync(UpdateManifest manifest, string installer,
+        VerifiedPackageStore store, CancellationToken token = default)
+    {
+        if (!Configured) throw new InvalidOperationException("Update trust not configured.");
+        if (manifestUri.Scheme != Uri.UriSchemeHttps) throw new InvalidDataException("HTTPS required.");
+        var data = await ReadSmallAsync(manifestUri, 65536, token);
+        var signature = await ReadSmallAsync(new Uri(manifestUri.AbsoluteUri + ".sig"), 8192, token);
+        var authenticated = SignedPackageMetadata.Authenticate(data, signature, publicKeyPem, product, channel);
+        if (authenticated != manifest) throw new CryptographicException("Update metadata changed.");
+        return await store.RetainAsync(installer, data, signature, token);
+    }
+
     public static async Task VerifyPackageAsync(string path,UpdateManifest m,CancellationToken token=default)
     {
         await using var stream=File.OpenRead(path);

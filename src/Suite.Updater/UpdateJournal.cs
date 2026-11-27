@@ -39,7 +39,15 @@ public sealed class UpdateJournal
             var bytes = new byte[MaxBytes + 1];
             int count = stream.ReadAtLeast(bytes, bytes.Length, false);
             if (count > MaxBytes) return new(JournalStatus.Invalid, null);
-            var transaction = JsonSerializer.Deserialize<UpdateTransaction>(bytes.AsSpan(0, count), Json);
+            using var document = JsonDocument.Parse(bytes.AsMemory(0,count));
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                return new(JournalStatus.Invalid,null);
+            var fields = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var property in document.RootElement.EnumerateObject())
+                if (!fields.Add(property.Name)) return new(JournalStatus.Invalid,null);
+            if (!fields.SetEquals(new[]{"Id","Product","PreviousVersion","TargetVersion","Phase"}))
+                return new(JournalStatus.Invalid,null);
+            var transaction = document.RootElement.Deserialize<UpdateTransaction>(Json);
             return IsValid(transaction) ? new(JournalStatus.Valid, transaction) : new(JournalStatus.Invalid, null);
         }
         catch (FileNotFoundException) { return new(JournalStatus.Missing, null); }

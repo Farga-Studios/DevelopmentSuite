@@ -1,0 +1,25 @@
+name: Publish shared NuGet package
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - run: dotnet test tests/Suite.Updater.Tests -c Release -f net8.0
+      - run: dotnet test tests/Suite.Updater.Tests -c Release -f net10.0
+      - run: dotnet pack src/Suite.Updater -c Release -o packages
+      - name: Publish immutable version to organization feed
+        shell: pwsh
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          dotnet nuget push packages/*.nupkg --source https://nuget.pkg.github.com/Farga-Studios/index.json --api-key $env:NUGET_AUTH_TOKEN

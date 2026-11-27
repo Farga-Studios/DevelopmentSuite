@@ -18,3 +18,6 @@ Acceptance: both runtime tests green, both package assemblies present, clean con
 
 ## Public distribution migration
 SpriteLab is now public. GitHub Packages still requires authentication even when the NuGet package is public. Keep the existing 0.2.0 private-feed dependency working until an anonymous package is verified on nuget.org. The manual Publish updater to NuGet.org workflow is prepared but deliberately blocked while the suite repository is private or lacks license metadata or a new version. After source/history/dependency audit, add MIT license and package metadata, increment version, update CI version checks, make repository public with owner approval, configure the nuget-public environment and scoped publishing credential, and run the workflow from main. Verify clean anonymous restore in a SpriteLab PR before changing its source mapping; no tokens in consumer repositories. No publication performed by adding this workflow.
+
+## 0.2.1 candidate
+MIT package metadata and version-independent CI package selection are prepared. Existing SpriteLab 0.2.0 dependency remains unchanged. Public source/history review, visibility change, NuGet.org credential setup, publication and anonymous restore validation remain pending.

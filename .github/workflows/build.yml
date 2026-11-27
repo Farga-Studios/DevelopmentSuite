@@ -20,7 +20,9 @@ jobs:
         shell: pwsh
         run: |
           Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $package = Get-Item packages/FargaStudios.Suite.Updater.0.2.0.nupkg
+          $packages = @(Get-ChildItem packages -Filter 'FargaStudios.Suite.Updater.*.nupkg' -File)
+          if ($packages.Count -ne 1) { throw 'Expected exactly one updater package' }
+          $package = $packages[0]
           $zip = [System.IO.Compression.ZipFile]::OpenRead($package.FullName)
           try {
             foreach ($tfm in @('net8.0','net10.0')) {
@@ -29,6 +31,6 @@ jobs:
           } finally { $zip.Dispose() }
       - uses: actions/upload-artifact@v4
         with:
-          name: suite-updater-0.2.0-candidate
+          name: suite-updater-candidate
           path: packages/*.nupkg
           if-no-files-found: error

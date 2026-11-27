@@ -22,6 +22,8 @@ jobs:
         env:
           NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $package = Get-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'packages/FargaStudios.Suite.Updater.0.2.0.nupkg') -ErrorAction Stop
+          $packages = @(Get-ChildItem packages -Filter 'FargaStudios.Suite.Updater.*.nupkg' -File)
+          if ($packages.Count -ne 1) { throw 'Expected exactly one updater package' }
+          $package = $packages[0]
           dotnet nuget push "$($package.FullName)" --source https://nuget.pkg.github.com/Farga-Studios/index.json --api-key $env:NUGET_AUTH_TOKEN
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

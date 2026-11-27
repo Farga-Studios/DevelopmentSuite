@@ -12,11 +12,7 @@ public sealed class VerifiedPackageStore(string directory, string publicKeyPem, 
         return Path.Combine(root, version);
     }
 
-    private static void RejectLink(string path)
-    {
-        if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-            throw new IOException("Package links are not allowed.");
-    }
+    private static void RejectLink(string path) => UpdatePathSafety.RejectLinks(path);
 
     private static async Task<byte[]> ReadBoundedAsync(string path, int limit, CancellationToken token)
     {

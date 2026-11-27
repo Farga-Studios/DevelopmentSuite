@@ -3,7 +3,7 @@ namespace Suite.Updater;
 public enum RecoveryStatus
 {
     NoTransaction, InvalidJournal, Healthy, Interrupted,
-    HealthCheckRequired, RecoveryRequired, UnexpectedVersion
+    HealthCheckRequired, RecoveryRequired, UnexpectedVersion, RollbackHealthCheckRequired, RollbackInterrupted, RolledBack
 }
 
 public sealed record RecoveryAssessment(RecoveryStatus Status, UpdateTransaction? Transaction);
@@ -27,6 +27,10 @@ public sealed class UpdateRecovery(UpdateJournal journal)
             return new(RecoveryStatus.UnexpectedVersion, t);
         var status = t.Phase switch
         {
+            UpdatePhase.RollbackStarted when running == previous => RecoveryStatus.RollbackHealthCheckRequired,
+            UpdatePhase.RollbackStarted => RecoveryStatus.RollbackInterrupted,
+            UpdatePhase.RolledBack when running == previous => RecoveryStatus.RolledBack,
+            UpdatePhase.RolledBack => RecoveryStatus.UnexpectedVersion,
             UpdatePhase.Completed when running == target => RecoveryStatus.Healthy,
             UpdatePhase.Completed => RecoveryStatus.UnexpectedVersion,
             UpdatePhase.RecoveryRequired => RecoveryStatus.RecoveryRequired,
@@ -48,6 +52,24 @@ public sealed class UpdateRecovery(UpdateJournal journal)
         if (t.Phase == UpdatePhase.HandoffStarted)
             journal.Advance(id, UpdatePhase.AwaitingHealthCheck);
         return journal.Advance(id, UpdatePhase.Completed);
+    }
+
+    public UpdateTransaction MarkRollbackStarted(Guid id, Version runningVersion)
+    {
+        var assessment = Assess(runningVersion);
+        if (assessment.Status != RecoveryStatus.RecoveryRequired || assessment.Transaction is not { } t ||
+            t.Id != id || runningVersion.Revision > 0 ||
+            new Version(runningVersion.Major, runningVersion.Minor, Math.Max(0,runningVersion.Build)) != Version.Parse(t.TargetVersion))
+            throw new InvalidOperationException("Cannot start rollback.");
+        return journal.Advance(id, UpdatePhase.RollbackStarted);
+    }
+
+    public UpdateTransaction ConfirmRollbackHealthy(Guid id, Version runningVersion)
+    {
+        var assessment = Assess(runningVersion);
+        if (assessment.Status != RecoveryStatus.RollbackHealthCheckRequired || assessment.Transaction?.Id != id)
+            throw new InvalidOperationException("Cannot confirm rollback.");
+        return journal.Advance(id, UpdatePhase.RolledBack);
     }
 
     public UpdateTransaction RequireRecovery(Guid id)

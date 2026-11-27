@@ -40,7 +40,7 @@ public sealed class UpdateClient(HttpClient http, Uri manifestUri, string public
         // Reauthenticate metadata to prevent callers substituting an unsigned record.
         var authenticated=await CheckAsync(new Version(0,0,0),token);
         if(authenticated!=m)throw new CryptographicException("Update metadata changed.");
-        Directory.CreateDirectory(root);
+        UpdatePathSafety.EnsureDirectory(root);
         var path=Path.Combine(root,Guid.NewGuid().ToString("N")+"-"+m.FileName);
         try
         {

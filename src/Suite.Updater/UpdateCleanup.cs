@@ -12,8 +12,7 @@ public static class UpdateCleanup
             throw new ArgumentOutOfRangeException(nameof(minimumAge));
         var root = Path.GetFullPath(cacheRoot);
         if (!Directory.Exists(root)) return new(0,0);
-        if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0)
-            throw new IOException("Invalid cache root.");
+        UpdatePathSafety.RejectLinks(root);
         int removed = 0, skipped = 0;
         foreach (var directory in Directory.EnumerateDirectories(root,".pending-*",SearchOption.TopDirectoryOnly))
         {

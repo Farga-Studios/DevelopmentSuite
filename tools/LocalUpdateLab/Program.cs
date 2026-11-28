@@ -2,6 +2,9 @@ using System.Net;
 using System.Diagnostics;
 using Suite.Updater;
 
+if (args.Length == 4 && args[0] == "--resolve-cancelled")
+    return ResolveCancelled(args[1], args[2], args[3]);
+
 if ((args.Length != 4 && (args.Length != 7 || args[4] != "--install")) || args[0] is not ("SpriteLab" or "MarkdownLab") || !Version.TryParse(args[1], out var installed))
 {
     Console.Error.WriteLine("Usage: LocalUpdateLab <SpriteLab|MarkdownLab> <installed-version> <candidate-directory> <public-key.pem>");
@@ -86,6 +89,50 @@ catch (Exception ex)
 finally
 {
     if (!install && Directory.Exists(root)) Directory.Delete(root, true);
+}
+
+static int ResolveCancelled(string product, string versionText, string appDirectory)
+{
+    try
+    {
+        if (!OperatingSystem.IsWindows() || product is not ("SpriteLab" or "MarkdownLab") ||
+            !Version.TryParse(versionText, out var version) || version.Build < 0 || version.Revision >= 0)
+            throw new InvalidOperationException("Invalid recovery arguments.");
+        var executable = product == "SpriteLab" ? "SpriteLab.App" : "MarkdownLab";
+        var uninstallId = product == "SpriteLab" ? "{B637E3EE-3A57-474F-9F87-C70E3F12AE3B}" : "Sealsworn.MarkdownLab";
+        if (!InstallerHandoff.IsInstalled(appDirectory, uninstallId))
+            throw new InvalidOperationException("Installation location mismatch.");
+        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), product,
+            product == "SpriteLab" ? "Updates" : Path.Combine("Workspace", "updates"));
+        using var session = UpdateSessionLock.Acquire(root);
+        var journal = new UpdateJournal(root, product);
+        var recovery = new UpdateRecovery(journal);
+        var assessment = recovery.Assess(version);
+        if (assessment.Status != RecoveryStatus.Interrupted || assessment.Transaction is not { } transaction ||
+            transaction.Phase is not (UpdatePhase.HandoffStarted or UpdatePhase.AwaitingHealthCheck))
+            throw new InvalidOperationException("No matching interrupted installation.");
+        if (new InstallerExitEvidence(root).HasCompletion(transaction.Id))
+            throw new InvalidOperationException("Completion receipt exists; manual diagnosis required.");
+        var file = FileVersionInfo.GetVersionInfo(Path.Combine(appDirectory, executable + ".exe"));
+        if (new Version(file.FileMajorPart,file.FileMinorPart,file.FileBuildPart) != version)
+            throw new InvalidOperationException("Previous executable version mismatch.");
+        Console.WriteLine("Only for a cancelled setup before file copying. Verify all installer processes have exited and the previous application opens, edits and saves successfully. Close the application again.");
+        Console.WriteLine("Type ABORT to acknowledge these checks, or press Enter to leave the journal unchanged.");
+        if (Console.ReadLine() != "ABORT") return 2;
+        var processes = Process.GetProcesses();
+        try
+        {
+            if (processes.Any(p => p.ProcessName.Equals(executable,StringComparison.OrdinalIgnoreCase) ||
+                p.ProcessName.Contains("-win-x64-setup",StringComparison.OrdinalIgnoreCase) ||
+                p.ProcessName.Contains("MarkdownLab-Setup",StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("Application or possible installer still running.");
+        }
+        finally { foreach (var p in processes) p.Dispose(); }
+        recovery.ResolveInterrupted(transaction.Id, version, true, true, true);
+        Console.WriteLine("PASS: interrupted transaction closed as Aborted. Signed packages preserved.");
+        return 0;
+    }
+    catch (Exception ex) { Console.Error.WriteLine("FAIL: " + ex.Message); return 1; }
 }
 
 sealed class LocalTransport(string folder, string product) : HttpMessageHandler

@@ -18,7 +18,7 @@ public static class InstallerHandoff
         }
         catch(Exception ex) when(ex is IOException or UnauthorizedAccessException or ArgumentException or System.Security.SecurityException){return false;}
     }
-    public static async Task LaunchAsync(PreparedUpdate update,string stagingRoot,CancellationToken token=default, string? applicationUpdateSwitch=null)
+    public static async Task LaunchAsync(PreparedUpdate update,string stagingRoot,CancellationToken token=default, string? applicationUpdateSwitch=null, Guid? transactionId=null)
     {
         if(!OperatingSystem.IsWindows())throw new PlatformNotSupportedException();
         var path=Path.GetFullPath(update.Path);
@@ -27,11 +27,17 @@ public static class InstallerHandoff
             !Path.GetFileName(path).EndsWith("-"+update.Manifest.FileName,StringComparison.Ordinal)||
             (File.GetAttributes(path)&FileAttributes.ReparsePoint)!=0)
             throw new InvalidDataException("Invalid installer staging path.");
+        UpdatePathSafety.RejectLinks(path);
         using var locked=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read);
         await UpdateClient.VerifyPackageAsync(path,update.Manifest,token);
         token.ThrowIfCancellationRequested();
         var info=new ProcessStartInfo(path){UseShellExecute=false,WorkingDirectory=parent};
         if(!string.IsNullOrEmpty(applicationUpdateSwitch))info.ArgumentList.Add(applicationUpdateSwitch);
+        if(transactionId is Guid id)
+        {
+            new InstallerExitEvidence(parent).Prepare(id);
+            info.ArgumentList.Add("/RECOVERYID="+id.ToString("N"));
+        }
         info.ArgumentList.Add("/NOCLOSEAPPLICATIONS");
         info.ArgumentList.Add("/WAITPID="+Environment.ProcessId);
         using var process=Process.Start(info)??throw new InvalidOperationException("Could not start installer.");

@@ -1,6 +1,8 @@
-# Suite.Updater 0.2.0 candidate
+# Suite.Updater 0.3.0
 
-The package is UI-independent and targets net8.0 and net10.0. Build using the .NET 10 SDK; execute tests with both runtimes.
+Package ID: `FargaStudios.Suite.Updater`. UI-independent, targets net8.0 and net10.0. MIT. The 0.3.0 release is prepared, not yet published; 0.3.0-rc.2 was used for local consumer acceptance.
+
+## Build and test
 
 ```powershell
 dotnet test tests/Suite.Updater.Tests -c Release -f net8.0
@@ -8,19 +10,12 @@ dotnet test tests/Suite.Updater.Tests -c Release -f net10.0
 dotnet pack src/Suite.Updater -c Release -o packages
 ```
 
-CI retains a versioned candidate .nupkg as a workflow artifact. For local integration, copy it to a local NuGet feed outside the source tree and add that source to NuGet configuration. Pin `<PackageReference Include="FargaStudios.Suite.Updater" Version="0.2.0" />`. Do not commit credentials or binaries. A durable public feed (or approved public package distribution) is pending the open-source audit; do not introduce a remote private-feed dependency into public consumers.
+CI verifies both framework assemblies in the package. Consumer candidate feeds pin an exact reviewed source commit; replace these with an exact stable NuGet reference only after successful public publication and anonymous restore validation.
 
-SpriteLab: remove its updater source snapshot when replacing it with the package; pass the application-specific installer switch explicitly if needed. MarkdownLab: preserve AppId, data paths, existing releases and 1.7 upgrade path; integrate in a separate 1.8 candidate. Its future signed installer filename must match the shared manifest contract or an explicitly reviewed contract extension. Both apps own their UI, trust key, channel, release repository and installer lifecycle.
+## Integration
 
-Windows handoff requires a compatible installer implementing /WAITPID and /NOCLOSEAPPLICATIONS. The library verifies the staged package again; the caller is responsible for saving documents and closing the application. Optional application-specific switch is passed as one argument. No automatic rollback is implemented.
+SpriteLab and MarkdownLab own their UI, pinned public key, stable channel, installer identity, project data and shutdown lifecycle. Use the documented manifest contract without changing signed bytes or trust roots. Windows installers implement /WAITPID, /NOCLOSEAPPLICATIONS and transaction-specific completion receipts. Save user work before handoff. Recovery is explicit, not automatic; signed retained baseline, installer exit, compatible backed-up data and approval are required for rollback. No receipt or unknown installation state requires conservative handling. See [local acceptance](UPDATE-ACCEPTANCE-0.3.0.md).
 
-Acceptance: both runtime tests green, both package assemblies present, clean consumer restore and build, Windows installer lifecycle and actual signed updates verified. No release publication, signing key provisioning, or public visibility change is implied.
+## Publication
 
-## Public distribution migration
-SpriteLab is now public. GitHub Packages still requires authentication even when the NuGet package is public. Keep the existing 0.2.0 private-feed dependency working until an anonymous package is verified on nuget.org. The manual Publish updater to NuGet.org workflow is prepared but deliberately blocked while the suite repository is private or lacks license metadata or a new version. After source/history/dependency audit, add MIT license and package metadata, increment version, update CI version checks, make repository public with owner approval, configure the nuget-public environment and scoped Trusted Publishing policy, and run the workflow from main. Verify clean anonymous restore in a SpriteLab PR before changing its source mapping; no tokens in consumer repositories. No publication performed by adding this workflow.
-
-## 0.2.1 candidate
-MIT package metadata and version-independent CI package selection are prepared. Existing SpriteLab 0.2.0 dependency remains unchanged. Public source/history review, visibility change, NuGet.org Trusted Publishing setup, publication and anonymous restore validation remain pending.
-
-## Trusted Publishing
-The manual publish-nuget-org.yml workflow exchanges a GitHub OIDC identity for a short-lived NuGet API key via NuGet/login@v1. The active policy is scoped to FargaStudios.Suite.Updater, Farga-Studios/DevelopmentSuite, the workflow filename and nuget-public environment. No persistent API key is required. Run from main only after review. The login user is the public NuGet profile name FargaStudios.
+The existing manual publish-nuget-org.yml workflow runs only on public main, with the nuget-public environment and OIDC Trusted Publishing scoped to the package, repository and workflow. No persistent key is required. Review CI and obtain owner approval before merging and dispatching. Verify the actual published version and both clean consumer restores. Package publication is separate from application release approval. Future application publication automation is owned by ReleaseInfrastructure, not this library.

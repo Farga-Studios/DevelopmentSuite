@@ -8,14 +8,14 @@ Shared infrastructure for independent desktop tools by Farga Studios.
 
 | Component | Purpose | Status |
 | --- | --- | --- |
-| Suite.Updater | Signed update metadata, verified downloads and Windows installer handoff | 0.2.1 candidate |
+| Suite.Updater | Signed update metadata, verified downloads, installer handoff and recovery | 0.3.0 release candidate |
 | Suite.Core | Cross-tool contracts | Planned |
 | Suite.UI | Shared design principles | Design contract |
 | Suite.Localization | Language resources | Design contract |
 | Suite.Settings | Local preferences | Design contract |
 | Suite.Diagnostics | Logging and diagnostics | Planned |
 
-SpriteLab consumes the 0.2.0 package from GitHub Packages. MarkdownLab integration is planned. The 0.2.1 candidate prepares anonymous NuGet.org distribution; it has not been published there.
+SpriteLab and MarkdownLab have passed local Windows acceptance using 0.3.0-rc.2. The stable 0.3.0 package is being prepared for NuGet.org; production channel validation and stable consumer migration remain pending. See [acceptance results](docs/UPDATE-ACCEPTANCE-0.3.0.md). The [DevelopmentSuite Design System](docs/DESIGN-SYSTEM.md) defines the proposed shared visual contract for suite applications only.
 
 ## Development
 

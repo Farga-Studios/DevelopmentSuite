@@ -1,14 +1,11 @@
 using System.Net.Http;
 using System.Security.Cryptography;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace Suite.Updater;
 
 public sealed record UpdateManifest(string Product,string Channel,string Version,string FileName,long Bytes,string Sha256,string Notes);
 public sealed class UpdateClient(HttpClient http, Uri manifestUri, string publicKeyPem, string product, string channel, string repositoryOwner="Farga-Studios", string? repositoryName=null)
 {
-    private static readonly JsonSerializerOptions Json=new(){PropertyNamingPolicy=JsonNamingPolicy.SnakeCaseLower,UnmappedMemberHandling=JsonUnmappedMemberHandling.Disallow};
     public bool Configured=>!string.IsNullOrWhiteSpace(publicKeyPem);
     private async Task<byte[]> ReadSmallAsync(Uri uri,int limit,CancellationToken token)
     {
@@ -25,11 +22,7 @@ public sealed class UpdateClient(HttpClient http, Uri manifestUri, string public
         if(manifestUri.Scheme!=Uri.UriSchemeHttps)throw new InvalidDataException("HTTPS required.");
         var data=await ReadSmallAsync(manifestUri,65536,token);
         var signature=await ReadSmallAsync(new Uri(manifestUri.AbsoluteUri+".sig"),8192,token);
-        using var rsa=RSA.Create();rsa.ImportFromPem(publicKeyPem);
-        if(rsa.KeySize<2048||!rsa.VerifyData(data,signature,HashAlgorithmName.SHA256,RSASignaturePadding.Pkcs1))
-            throw new CryptographicException("Update signature invalid.");
-        var m=JsonSerializer.Deserialize<UpdateManifest>(data,Json)??throw new InvalidDataException("Missing manifest.");
-        Validate(m);
+        var m=SignedPackageMetadata.Authenticate(data,signature,publicKeyPem,product,channel);
         var available=System.Version.Parse(m.Version);
         var normalized=new Version(installed.Major,installed.Minor,Math.Max(0,installed.Build),Math.Max(0,installed.Revision));
         return new Version(available.Major,available.Minor,available.Build,0)>normalized?m:null;
@@ -41,22 +34,13 @@ public sealed class UpdateClient(HttpClient http, Uri manifestUri, string public
         if(!ValidSegment(repositoryOwner)||!ValidSegment(repository))throw new InvalidDataException("Invalid repository configuration.");
         return new Uri($"https://github.com/{repositoryOwner}/{repository}/releases/download/v{m.Version}/{m.FileName}");
     }
-    private void Validate(UpdateManifest m)
-    {
-        if(m.Product!=product||m.Channel!=channel||!System.Version.TryParse(m.Version,out var version)||
-            version.Build<0||version.Revision>=0||m.Version!=version.ToString(3)||
-            string.IsNullOrEmpty(product)||!product.All(c=>char.IsAsciiLetterOrDigit(c)||c=='-'||c=='_')||m.FileName!=$"{product}-{m.Version}-win-x64-setup.exe"||
-            m.Bytes is <1 or >536870912||m.Sha256 is null||m.Sha256.Length!=64||!m.Sha256.All(Uri.IsHexDigit)||
-            m.Notes is null||m.Notes.Length>20000)throw new InvalidDataException("Invalid update manifest.");
-    }
     public async Task<string> DownloadAsync(UpdateManifest m,string root,IProgress<int>? progress,CancellationToken token=default)
     {
         if(!Configured)throw new InvalidOperationException("Update trust not configured.");
-        Validate(m);
         // Reauthenticate metadata to prevent callers substituting an unsigned record.
         var authenticated=await CheckAsync(new Version(0,0,0),token);
         if(authenticated!=m)throw new CryptographicException("Update metadata changed.");
-        Directory.CreateDirectory(root);
+        UpdatePathSafety.EnsureDirectory(root);
         var path=Path.Combine(root,Guid.NewGuid().ToString("N")+"-"+m.FileName);
         try
         {
@@ -77,6 +61,19 @@ public sealed class UpdateClient(HttpClient http, Uri manifestUri, string public
         }
         catch{if(File.Exists(path))File.Delete(path);throw;}
     }
+    /// <summary>Retain a downloaded package with authenticated original metadata.</summary>
+    public async Task<PreparedUpdate> RetainDownloadedAsync(UpdateManifest manifest, string installer,
+        VerifiedPackageStore store, CancellationToken token = default)
+    {
+        if (!Configured) throw new InvalidOperationException("Update trust not configured.");
+        if (manifestUri.Scheme != Uri.UriSchemeHttps) throw new InvalidDataException("HTTPS required.");
+        var data = await ReadSmallAsync(manifestUri, 65536, token);
+        var signature = await ReadSmallAsync(new Uri(manifestUri.AbsoluteUri + ".sig"), 8192, token);
+        var authenticated = SignedPackageMetadata.Authenticate(data, signature, publicKeyPem, product, channel);
+        if (authenticated != manifest) throw new CryptographicException("Update metadata changed.");
+        return await store.RetainAsync(installer, data, signature, token);
+    }
+
     public static async Task VerifyPackageAsync(string path,UpdateManifest m,CancellationToken token=default)
     {
         await using var stream=File.OpenRead(path);
